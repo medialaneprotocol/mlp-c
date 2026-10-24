@@ -339,3 +339,12 @@ void input_queue_submit(input_queue_t *q, const char *code, int pressed, uint64_
     q->count++;
 }
 size_t input_queue_len(input_queue_t *q) { return q->count; }
+
+void xor_parity(const uint8_t **data, const size_t *lens, size_t n, uint8_t *out, size_t outlen) {
+    memset(out, 0, outlen);
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = 0; j < lens[i] && j < outlen; j++) {
+            out[j] ^= data[i][j];
+        }
+    }
+}

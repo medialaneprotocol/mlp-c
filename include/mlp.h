@@ -122,3 +122,6 @@ input_queue_t *input_queue_new(void);
 void input_queue_free(input_queue_t *q);
 void input_queue_submit(input_queue_t *q, const char *code, int pressed, uint64_t seq);
 size_t input_queue_len(input_queue_t *q);
+
+/* FEC helper */
+void xor_parity(const uint8_t **data, const size_t *lens, size_t n, uint8_t *out, size_t outlen);
