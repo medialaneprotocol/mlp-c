@@ -78,3 +78,9 @@ int fragment_encode(const fragment_t *f, uint8_t *out, size_t outcap, size_t *ou
 int fragment_parse(fragment_t *f, const uint8_t *buf, size_t buflen, size_t *consumed);
 
 #endif
+
+#define CARRIER_WS 0
+#define CARRIER_GRPC 1
+#define FLAG_ANCHOR 1
+#define FLAG_ECHO_REQUESTED 2
+#define FLAG_DUPLICATE 4
