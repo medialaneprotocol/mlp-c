@@ -13,6 +13,7 @@
 
 #define CLASS_MEDIA 2
 #define CLASS_DATAGRAM 5
+#define CLASS_FEC 6
 
 #define PRIO_INPUT 1
 #define PRIO_MEDIA 6
