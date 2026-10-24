@@ -481,3 +481,63 @@ int loss_detector_is_lost(loss_detector_t *ld, uint64_t pn) {
     return ld_contains(ld->lost, ld->lost_count, pn);
 }
 size_t loss_detector_lost_count(loss_detector_t *ld) { return ld->lost_count; }
+
+object_assembler_t *assembler_new(void) {
+    object_assembler_t *a = calloc(1, sizeof(*a));
+    a->cap = 8;
+    a->objects = calloc(a->cap, sizeof(open_object_t));
+    return a;
+}
+void assembler_free(object_assembler_t *a) {
+    if (!a) return;
+    for (size_t i = 0; i < a->count; i++) {
+        for (uint16_t j = 0; j < a->objects[i].declared; j++) free(a->objects[i].parts[j]);
+        free(a->objects[i].parts);
+        free(a->objects[i].part_lens);
+    }
+    free(a->objects);
+    free(a);
+}
+static open_object_t *assembler_find(object_assembler_t *a, uint32_t oid) {
+    for (size_t i = 0; i < a->count; i++) if (a->objects[i].object_id == oid && !a->objects[i].complete) return &a->objects[i];
+    return NULL;
+}
+int assembler_accept(object_assembler_t *a, const uint8_t *data, size_t len, open_object_t **out) {
+    fragment_t *f = fragment_new();
+    size_t consumed = 0;
+    if (fragment_parse(f, data, len, &consumed) != 0) { fragment_free(f); return -1; }
+    if (consumed != len) { fragment_free(f); return -1; }
+    open_object_t *obj = assembler_find(a, f->header.object_id);
+    if (!obj) {
+        if (a->count == a->cap) {
+            a->cap *= 2;
+            a->objects = realloc(a->objects, a->cap * sizeof(open_object_t));
+        }
+        obj = &a->objects[a->count++];
+        memset(obj, 0, sizeof(*obj));
+        obj->object_id = f->header.object_id;
+        obj->declared = f->header.fragment_count;
+        obj->parts = calloc(obj->declared, sizeof(uint8_t*));
+        obj->part_lens = calloc(obj->declared, sizeof(size_t));
+    }
+    if (f->header.fragment_count != obj->declared) { fragment_free(f); return -1; }
+    uint16_t idx = f->header.fragment_index;
+    if (obj->parts[idx] != NULL) { fragment_free(f); return -1; /* duplicate */ }
+    obj->parts[idx] = malloc(f->payload_len ? f->payload_len : 1);
+    memcpy(obj->parts[idx], f->payload, f->payload_len);
+    obj->part_lens[idx] = f->payload_len;
+    obj->received++;
+    if (obj->received >= obj->declared) {
+        obj->complete = 1;
+        if (out) *out = obj;
+        fragment_free(f);
+        return 1; /* complete */
+    }
+    fragment_free(f);
+    return 0; /* pending */
+}
+size_t assembler_open_count(object_assembler_t *a) {
+    size_t n = 0;
+    for (size_t i = 0; i < a->count; i++) if (!a->objects[i].complete) n++;
+    return n;
+}

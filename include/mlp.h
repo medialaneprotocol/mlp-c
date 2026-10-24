@@ -157,3 +157,11 @@ void loss_detector_on_send(loss_detector_t *ld, uint64_t pn);
 void loss_detector_on_ack(loss_detector_t *ld, const uint64_t *acked, size_t n);
 int loss_detector_is_lost(loss_detector_t *ld, uint64_t pn);
 size_t loss_detector_lost_count(loss_detector_t *ld);
+
+/* Object assembler helper */
+typedef struct { uint32_t object_id; uint16_t declared; uint16_t received; uint8_t **parts; size_t *part_lens; int complete; } open_object_t;
+typedef struct { open_object_t *objects; size_t count, cap; } object_assembler_t;
+object_assembler_t *assembler_new(void);
+void assembler_free(object_assembler_t *a);
+int assembler_accept(object_assembler_t *a, const uint8_t *data, size_t len, open_object_t **out);
+size_t assembler_open_count(object_assembler_t *a);
