@@ -188,3 +188,16 @@ simple_pacer_t *pacer_new(uint64_t pace_bps, uint64_t max_grant);
 void pacer_free(simple_pacer_t *p);
 int pacer_try_acquire(simple_pacer_t *p, uint64_t bytes, double now_sec);
 uint64_t pacer_budget(simple_pacer_t *p);
+
+/* State machine helper */
+typedef struct { int phase; } state_machine_t;
+state_machine_t *sm_new(void);
+void sm_free(state_machine_t *sm);
+void sm_transition(state_machine_t *sm, int to);
+int sm_is_active(state_machine_t *sm);
+int sm_is_closed(state_machine_t *sm);
+
+/* Lifecycle helper */
+typedef struct { int lane_mode; int media_lane_enabled; } media_lane_policy_t;
+media_lane_policy_t *policy_new(int enabled);
+void policy_free(media_lane_policy_t *p);

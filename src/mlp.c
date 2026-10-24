@@ -616,3 +616,17 @@ int pacer_try_acquire(simple_pacer_t *p, uint64_t bytes, double now_sec) {
     return 0;
 }
 uint64_t pacer_budget(simple_pacer_t *p) { return p->max_grant; }
+
+state_machine_t *sm_new(void) { state_machine_t *sm = calloc(1, sizeof(*sm)); return sm; }
+void sm_free(state_machine_t *sm) { free(sm); }
+void sm_transition(state_machine_t *sm, int to) { sm->phase = to; }
+int sm_is_active(state_machine_t *sm) { return sm->phase == 2; } /* ACTIVE=2 */
+int sm_is_closed(state_machine_t *sm) { return sm->phase == 6; } /* CLOSED=6 */
+
+media_lane_policy_t *policy_new(int enabled) {
+    media_lane_policy_t *p = calloc(1, sizeof(*p));
+    p->lane_mode = 0;
+    p->media_lane_enabled = enabled;
+    return p;
+}
+void policy_free(media_lane_policy_t *p) { free(p); }
