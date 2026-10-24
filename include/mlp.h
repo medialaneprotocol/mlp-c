@@ -24,6 +24,7 @@
 #define TLV_CHAIN_EPOCH 0x05
 #define TLV_REFLECTS_INPUT_SEQ 0x06
 #define TLV_SEND_EPOCH_MS 0x07
+#define TLV_GREASE 0x7F
 
 typedef struct { uint8_t kind; uint8_t *value; size_t len; } tlv_entry_t;
 typedef struct { tlv_entry_t *entries; size_t count; size_t cap; } header_ext_t;
