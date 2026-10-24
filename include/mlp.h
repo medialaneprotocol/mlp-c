@@ -95,3 +95,12 @@ typedef struct { uint16_t *cells; uint32_t w, h; } surface_canvas_t;
 surface_canvas_t *canvas_new(uint32_t w, uint32_t h);
 void canvas_free(surface_canvas_t *c);
 int receiver_accept_fragment(surface_canvas_t *c, const uint8_t *data, size_t len);
+
+/* Cell accounting */
+typedef struct { uint32_t *pending; size_t pending_count, pending_cap; } cell_accounting_t;
+cell_accounting_t *cell_accounting_new(void);
+void cell_accounting_free(cell_accounting_t *a);
+void cell_accounting_mark_pending(cell_accounting_t *a, const uint32_t *cells, size_t n);
+void cell_accounting_mark_applied(cell_accounting_t *a, const uint32_t *cells, size_t n);
+size_t cell_accounting_pending_count(cell_accounting_t *a);
+int cell_accounting_converged(cell_accounting_t *a);

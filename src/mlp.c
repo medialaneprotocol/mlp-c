@@ -260,3 +260,43 @@ int receiver_accept_fragment(surface_canvas_t *c, const uint8_t *data, size_t le
     fragment_free(f);
     return 0;
 }
+
+static int ca_contains(cell_accounting_t *a, uint32_t c) {
+    for (size_t i = 0; i < a->pending_count; i++) if (a->pending[i] == c) return 1;
+    return 0;
+}
+static void ca_remove(cell_accounting_t *a, uint32_t c) {
+    for (size_t i = 0; i < a->pending_count; i++) {
+        if (a->pending[i] == c) {
+            a->pending[i] = a->pending[--a->pending_count];
+            return;
+        }
+    }
+}
+cell_accounting_t *cell_accounting_new(void) {
+    cell_accounting_t *a = calloc(1, sizeof(*a));
+    a->pending_cap = 16;
+    a->pending = calloc(a->pending_cap, sizeof(uint32_t));
+    return a;
+}
+void cell_accounting_free(cell_accounting_t *a) {
+    if (!a) return;
+    free(a->pending);
+    free(a);
+}
+void cell_accounting_mark_pending(cell_accounting_t *a, const uint32_t *cells, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        if (!ca_contains(a, cells[i])) {
+            if (a->pending_count == a->pending_cap) {
+                a->pending_cap *= 2;
+                a->pending = realloc(a->pending, a->pending_cap * sizeof(uint32_t));
+            }
+            a->pending[a->pending_count++] = cells[i];
+        }
+    }
+}
+void cell_accounting_mark_applied(cell_accounting_t *a, const uint32_t *cells, size_t n) {
+    for (size_t i = 0; i < n; i++) ca_remove(a, cells[i]);
+}
+size_t cell_accounting_pending_count(cell_accounting_t *a) { return a->pending_count; }
+int cell_accounting_converged(cell_accounting_t *a) { return a->pending_count == 0; }
