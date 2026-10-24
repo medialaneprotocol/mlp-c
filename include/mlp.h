@@ -165,3 +165,11 @@ object_assembler_t *assembler_new(void);
 void assembler_free(object_assembler_t *a);
 int assembler_accept(object_assembler_t *a, const uint8_t *data, size_t len, open_object_t **out);
 size_t assembler_open_count(object_assembler_t *a);
+
+/* Metrics helper */
+typedef struct { uint64_t fragments_sent; uint64_t bytes_sent; uint64_t updates_applied; uint64_t convergences; } mlp_metrics_t;
+mlp_metrics_t *metrics_new(void);
+void metrics_free(mlp_metrics_t *m);
+void metrics_fragment_sent(mlp_metrics_t *m, uint64_t bytes);
+void metrics_update_applied(mlp_metrics_t *m);
+size_t metrics_render(mlp_metrics_t *m, char *buf, size_t cap);

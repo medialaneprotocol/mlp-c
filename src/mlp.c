@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "mlp.h"
 #include <stdlib.h>
 #include <string.h>
@@ -540,4 +541,25 @@ size_t assembler_open_count(object_assembler_t *a) {
     size_t n = 0;
     for (size_t i = 0; i < a->count; i++) if (!a->objects[i].complete) n++;
     return n;
+}
+
+mlp_metrics_t *metrics_new(void) { return calloc(1, sizeof(mlp_metrics_t)); }
+void metrics_free(mlp_metrics_t *m) { free(m); }
+void metrics_fragment_sent(mlp_metrics_t *m, uint64_t bytes) { m->fragments_sent++; m->bytes_sent += bytes; }
+void metrics_update_applied(mlp_metrics_t *m) { m->updates_applied++; }
+size_t metrics_render(mlp_metrics_t *m, char *buf, size_t cap) {
+    int n = snprintf(buf, cap,
+        "# HELP mlp_fragments_sent_total Total fragments sent.\n"
+        "# TYPE mlp_fragments_sent_total counter\n"
+        "mlp_fragments_sent_total %lu\n"
+        "# HELP mlp_bytes_sent_total Total bytes sent.\n"
+        "# TYPE mlp_bytes_sent_total counter\n"
+        "mlp_bytes_sent_total %lu\n"
+        "# HELP mlp_updates_applied_total Total updates applied.\n"
+        "# TYPE mlp_updates_applied_total counter\n"
+        "mlp_updates_applied_total %lu\n",
+        (unsigned long)m->fragments_sent,
+        (unsigned long)m->bytes_sent,
+        (unsigned long)m->updates_applied);
+    return n > 0 ? (size_t)n : 0;
 }

@@ -3,7 +3,7 @@ CFLAGS ?= -Iinclude -Wall -Wextra -O2
 
 .PHONY: test clean
 
-test: tests/test_golden tests/test_sender tests/test_cell tests/test_scheduler tests/test_bwe tests/test_input tests/test_fec tests/test_ticket tests/test_migration tests/test_qos tests/test_loss tests/test_assembly
+test: tests/test_golden tests/test_sender tests/test_cell tests/test_scheduler tests/test_bwe tests/test_input tests/test_fec tests/test_ticket tests/test_migration tests/test_qos tests/test_loss tests/test_assembly tests/test_metrics
 	./tests/test_golden
 	./tests/test_sender
 	./tests/test_cell
@@ -16,6 +16,7 @@ test: tests/test_golden tests/test_sender tests/test_cell tests/test_scheduler t
 	./tests/test_qos
 	./tests/test_loss
 	./tests/test_assembly
+	./tests/test_metrics
 
 tests/test_golden: src/mlp.c tests/test_golden.c
 	$(CC) $(CFLAGS) src/mlp.c tests/test_golden.c -o tests/test_golden
@@ -52,6 +53,9 @@ tests/test_loss: src/mlp.c tests/test_loss.c
 
 tests/test_assembly: src/mlp.c tests/test_assembly.c
 	$(CC) $(CFLAGS) src/mlp.c tests/test_assembly.c -o tests/test_assembly
+
+tests/test_metrics: src/mlp.c tests/test_metrics.c
+	$(CC) $(CFLAGS) src/mlp.c tests/test_metrics.c -o tests/test_metrics
 
 clean:
 	rm -f tests/test_golden
