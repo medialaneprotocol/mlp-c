@@ -206,3 +206,37 @@ int fragment_parse(fragment_t *f, const uint8_t *buf, size_t buflen, size_t *con
     if (consumed) *consumed = payloadEnd;
     return 0;
 }
+
+int sender_enqueue_update(const uint8_t *payload, size_t payload_len, uint32_t object_id,
+                          uint8_t *out, size_t outcap, size_t *outlen) {
+    /* Single-fragment update (payload must fit). */
+    update_meta_t m;
+    memset(&m, 0, sizeof(m));
+    m.update_id = object_id;
+    m.update_base = 0;
+    m.part_index = 0;
+    m.part_count = 1;
+    m.update_bytes = (uint32_t)payload_len;
+    m.chain_epoch = 1;
+    m.send_epoch_ms = 0;
+    header_ext_t *ext = update_meta_to_ext(&m);
+    fragment_t *f = fragment_new();
+    hex_free(f->ext);
+    f->ext = ext;
+    f->header.version = MEDIA_PROTOCOL_VERSION;
+    f->header.cls = CLASS_MEDIA;
+    f->header.flags = 0;
+    f->header.priority = PRIO_MEDIA;
+    f->header.object_id = object_id;
+    f->header.fragment_index = 0;
+    f->header.fragment_count = 1;
+    f->header.payload_len = (uint32_t)payload_len;
+    f->payload = malloc(payload_len ? payload_len : 1);
+    memcpy(f->payload, payload, payload_len);
+    f->payload_len = payload_len;
+    size_t n = 0;
+    if (fragment_encode(f, out, outcap, &n) != 0) { fragment_free(f); return -1; }
+    if (outlen) *outlen = n;
+    fragment_free(f);
+    return 1;
+}

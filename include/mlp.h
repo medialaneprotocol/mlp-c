@@ -85,3 +85,7 @@ int fragment_parse(fragment_t *f, const uint8_t *buf, size_t buflen, size_t *con
 #define FLAG_ANCHOR 1
 #define FLAG_ECHO_REQUESTED 2
 #define FLAG_DUPLICATE 4
+
+/* Minimal sender helper: build fragments for one update into out (returns count, -1 on error) */
+int sender_enqueue_update(const uint8_t *payload, size_t payload_len, uint32_t object_id,
+                          uint8_t *out, size_t outcap, size_t *outlen);
