@@ -594,3 +594,25 @@ int prober_best_path(path_prober_t *p) {
     }
     return p->results[best].path_id;
 }
+
+simple_pacer_t *pacer_new(uint64_t pace_bps, uint64_t max_grant) {
+    simple_pacer_t *p = calloc(1, sizeof(*p));
+    p->pace_bps = pace_bps;
+    p->max_grant = max_grant;
+    p->tokens = (double)pace_bps / 8.0;
+    p->last_refill = 0;
+    return p;
+}
+void pacer_free(simple_pacer_t *p) { free(p); }
+int pacer_try_acquire(simple_pacer_t *p, uint64_t bytes, double now_sec) {
+    double elapsed = now_sec - p->last_refill;
+    p->tokens = (p->tokens + elapsed * (double)p->pace_bps / 8.0);
+    if (p->tokens > (double)p->pace_bps / 8.0 * 1.25) p->tokens = (double)p->pace_bps / 8.0 * 1.25;
+    p->last_refill = now_sec;
+    if (p->tokens >= (double)bytes) {
+        p->tokens -= (double)bytes;
+        return 1;
+    }
+    return 0;
+}
+uint64_t pacer_budget(simple_pacer_t *p) { return p->max_grant; }

@@ -181,3 +181,10 @@ path_prober_t *prober_new(uint64_t interval_ms);
 void prober_free(path_prober_t *p);
 void prober_record(path_prober_t *p, probe_result_t r);
 int prober_best_path(path_prober_t *p); /* returns path_id or -1 */
+
+/* Pacer helper */
+typedef struct { uint64_t pace_bps; uint64_t max_grant; double tokens; double last_refill; } simple_pacer_t;
+simple_pacer_t *pacer_new(uint64_t pace_bps, uint64_t max_grant);
+void pacer_free(simple_pacer_t *p);
+int pacer_try_acquire(simple_pacer_t *p, uint64_t bytes, double now_sec);
+uint64_t pacer_budget(simple_pacer_t *p);
