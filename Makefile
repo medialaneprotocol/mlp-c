@@ -3,10 +3,11 @@ CFLAGS ?= -Iinclude -Wall -Wextra -O2
 
 .PHONY: test clean
 
-test: tests/test_golden tests/test_sender tests/test_cell
+test: tests/test_golden tests/test_sender tests/test_cell tests/test_scheduler
 	./tests/test_golden
 	./tests/test_sender
 	./tests/test_cell
+	./tests/test_scheduler
 
 tests/test_golden: src/mlp.c tests/test_golden.c
 	$(CC) $(CFLAGS) src/mlp.c tests/test_golden.c -o tests/test_golden
@@ -16,6 +17,9 @@ tests/test_sender: src/mlp.c tests/test_sender.c
 
 tests/test_cell: src/mlp.c tests/test_cell.c
 	$(CC) $(CFLAGS) src/mlp.c tests/test_cell.c -o tests/test_cell
+
+tests/test_scheduler: src/mlp.c tests/test_scheduler.c
+	$(CC) $(CFLAGS) src/mlp.c tests/test_scheduler.c -o tests/test_scheduler
 
 clean:
 	rm -f tests/test_golden

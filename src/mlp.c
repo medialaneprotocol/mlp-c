@@ -300,3 +300,9 @@ void cell_accounting_mark_applied(cell_accounting_t *a, const uint32_t *cells, s
 }
 size_t cell_accounting_pending_count(cell_accounting_t *a) { return a->pending_count; }
 int cell_accounting_converged(cell_accounting_t *a) { return a->pending_count == 0; }
+
+int scheduler_max_chunks(int datagram, double loss_ratio) {
+    (void)loss_ratio;
+    if (datagram) return 1;
+    return 8;
+}

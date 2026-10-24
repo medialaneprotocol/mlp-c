@@ -104,3 +104,6 @@ void cell_accounting_mark_pending(cell_accounting_t *a, const uint32_t *cells, s
 void cell_accounting_mark_applied(cell_accounting_t *a, const uint32_t *cells, size_t n);
 size_t cell_accounting_pending_count(cell_accounting_t *a);
 int cell_accounting_converged(cell_accounting_t *a);
+
+/* Scheduler helper */
+int scheduler_max_chunks(int datagram, double loss_ratio);
