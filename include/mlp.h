@@ -144,3 +144,7 @@ void migration_free(path_migration_t *m);
 void migration_start_probe(path_migration_t *m, uint8_t candidate, uint64_t challenge);
 int migration_complete(path_migration_t *m, uint64_t response);
 int migration_is_probing(path_migration_t *m);
+
+/* QoS helpers */
+int qos_mlp_priority(int tier);
+int qos_weight(int tier);

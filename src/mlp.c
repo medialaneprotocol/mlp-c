@@ -412,3 +412,22 @@ int migration_complete(path_migration_t *m, uint64_t response) {
     return 0;
 }
 int migration_is_probing(path_migration_t *m) { return m->state == 1; }
+
+int qos_mlp_priority(int tier) {
+    switch (tier) {
+        case 0: return 7; /* background */
+        case 1: return 6; /* best effort */
+        case 2: return 5; /* interactive */
+        case 3: return 2; /* realtime */
+    }
+    return 6;
+}
+int qos_weight(int tier) {
+    switch (tier) {
+        case 0: return 1;
+        case 1: return 2;
+        case 2: return 4;
+        case 3: return 8;
+    }
+    return 1;
+}
