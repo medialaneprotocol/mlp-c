@@ -313,3 +313,26 @@ bwe_estimate_t bwe_estimate(uint64_t pace_floor_bps, double rtt_ms) {
     e.pace_bps = pace_floor_bps;
     return e;
 }
+
+input_queue_t *input_queue_new(void) {
+    input_queue_t *q = calloc(1, sizeof(*q));
+    q->cap = 16;
+    q->events = calloc(q->cap, sizeof(input_event_t));
+    return q;
+}
+void input_queue_free(input_queue_t *q) {
+    if (!q) return;
+    free(q->events);
+    free(q);
+}
+void input_queue_submit(input_queue_t *q, const char *code, int pressed, uint64_t seq) {
+    if (q->count == q->cap) {
+        q->cap *= 2;
+        q->events = realloc(q->events, q->cap * sizeof(input_event_t));
+    }
+    strncpy(q->events[q->count].code, code, 31);
+    q->events[q->count].pressed = pressed;
+    q->events[q->count].seq = seq;
+    q->count++;
+}
+size_t input_queue_len(input_queue_t *q) { return q->count; }

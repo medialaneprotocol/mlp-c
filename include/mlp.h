@@ -111,3 +111,11 @@ int scheduler_max_chunks(int datagram, double loss_ratio);
 /* BWE helper */
 typedef struct { double rtt_ms; uint64_t pace_bps; } bwe_estimate_t;
 bwe_estimate_t bwe_estimate(uint64_t pace_floor_bps, double rtt_ms);
+
+/* Input helper */
+typedef struct { char code[32]; int pressed; uint64_t seq; } input_event_t;
+typedef struct { input_event_t *events; size_t count, cap; } input_queue_t;
+input_queue_t *input_queue_new(void);
+void input_queue_free(input_queue_t *q);
+void input_queue_submit(input_queue_t *q, const char *code, int pressed, uint64_t seq);
+size_t input_queue_len(input_queue_t *q);
