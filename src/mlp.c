@@ -355,3 +355,60 @@ void xor_parity(const uint8_t **data, const size_t *lens, size_t n, uint8_t *out
         }
     }
 }
+
+session_ticket_t *ticket_issue(uint64_t last_applied_update_id, uint32_t chain_epoch, uint64_t now_ms) {
+    session_ticket_t *t = calloc(1, sizeof(*t));
+    t->payload = calloc(12, 1);
+    for (int i = 0; i < 8; i++) t->payload[i] = (last_applied_update_id >> (8*i)) & 0xff;
+    for (int i = 0; i < 4; i++) t->payload[8+i] = (chain_epoch >> (8*i)) & 0xff;
+    t->len = 12;
+    t->issued_at_ms = now_ms;
+    t->nonce = now_ms ^ 0x9e3779b97f4a7c15ULL;
+    return t;
+}
+void ticket_free(session_ticket_t *t) {
+    if (!t) return;
+    free(t->payload);
+    free(t);
+}
+int ticket_valid(session_ticket_t *t, uint64_t now_ms) {
+    if (!t) return 0;
+    if (now_ms < t->issued_at_ms) return 0;
+    if (now_ms - t->issued_at_ms > 3600*1000) return 0;
+    return 1;
+}
+int ticket_validate(session_ticket_t *t, uint64_t now_ms, uint64_t *out_uid, uint32_t *out_epoch) {
+    if (!ticket_valid(t, now_ms)) return 0;
+    if (t->len < 12) return 0;
+    uint64_t uid = 0; uint32_t ep = 0;
+    for (int i = 0; i < 8; i++) uid |= (uint64_t)t->payload[i] << (8*i);
+    for (int i = 0; i < 4; i++) ep |= (uint32_t)t->payload[8+i] << (8*i);
+    if (out_uid) *out_uid = uid;
+    if (out_epoch) *out_epoch = ep;
+    return 1;
+}
+
+path_migration_t *migration_new(uint8_t active_path) {
+    path_migration_t *m = calloc(1, sizeof(*m));
+    m->active_path = active_path;
+    m->state = 0; /* IDLE */
+    return m;
+}
+void migration_free(path_migration_t *m) { free(m); }
+void migration_start_probe(path_migration_t *m, uint8_t candidate, uint64_t challenge) {
+    m->state = 1; /* PROBING */
+    m->candidate = candidate;
+    m->challenge = challenge;
+}
+int migration_complete(path_migration_t *m, uint64_t response) {
+    if (m->state != 1) return 0;
+    if (response == m->challenge) {
+        m->active_path = m->candidate;
+        m->state = 2; /* MIGRATED */
+        return 1;
+    }
+    m->state = 3; /* FAILED */
+    m->failures++;
+    return 0;
+}
+int migration_is_probing(path_migration_t *m) { return m->state == 1; }

@@ -129,3 +129,18 @@ size_t input_queue_len(input_queue_t *q);
 
 /* FEC helper */
 void xor_parity(const uint8_t **data, const size_t *lens, size_t n, uint8_t *out, size_t outlen);
+
+/* 0-RTT ticket helper */
+typedef struct { uint8_t *payload; size_t len; uint64_t issued_at_ms; uint64_t nonce; } session_ticket_t;
+session_ticket_t *ticket_issue(uint64_t last_applied_update_id, uint32_t chain_epoch, uint64_t now_ms);
+void ticket_free(session_ticket_t *t);
+int ticket_valid(session_ticket_t *t, uint64_t now_ms);
+int ticket_validate(session_ticket_t *t, uint64_t now_ms, uint64_t *out_uid, uint32_t *out_epoch);
+
+/* Connection migration helper */
+typedef struct { int state; uint8_t active_path; uint8_t candidate; uint64_t challenge; uint32_t failures; } path_migration_t;
+path_migration_t *migration_new(uint8_t active_path);
+void migration_free(path_migration_t *m);
+void migration_start_probe(path_migration_t *m, uint8_t candidate, uint64_t challenge);
+int migration_complete(path_migration_t *m, uint64_t response);
+int migration_is_probing(path_migration_t *m);
