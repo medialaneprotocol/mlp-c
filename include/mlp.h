@@ -173,3 +173,11 @@ void metrics_free(mlp_metrics_t *m);
 void metrics_fragment_sent(mlp_metrics_t *m, uint64_t bytes);
 void metrics_update_applied(mlp_metrics_t *m);
 size_t metrics_render(mlp_metrics_t *m, char *buf, size_t cap);
+
+/* Path probing helper */
+typedef struct { uint8_t path_id; double rtt_ms; double loss_ratio; uint64_t goodput_bps; } probe_result_t;
+typedef struct { probe_result_t *results; size_t count, cap; uint64_t interval_ms; } path_prober_t;
+path_prober_t *prober_new(uint64_t interval_ms);
+void prober_free(path_prober_t *p);
+void prober_record(path_prober_t *p, probe_result_t r);
+int prober_best_path(path_prober_t *p); /* returns path_id or -1 */

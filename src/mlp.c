@@ -563,3 +563,34 @@ size_t metrics_render(mlp_metrics_t *m, char *buf, size_t cap) {
         (unsigned long)m->updates_applied);
     return n > 0 ? (size_t)n : 0;
 }
+
+path_prober_t *prober_new(uint64_t interval_ms) {
+    path_prober_t *p = calloc(1, sizeof(*p));
+    p->interval_ms = interval_ms;
+    p->cap = 16;
+    p->results = calloc(p->cap, sizeof(probe_result_t));
+    return p;
+}
+void prober_free(path_prober_t *p) {
+    if (!p) return;
+    free(p->results);
+    free(p);
+}
+void prober_record(path_prober_t *p, probe_result_t r) {
+    if (p->count == p->cap) {
+        p->cap *= 2;
+        p->results = realloc(p->results, p->cap * sizeof(probe_result_t));
+    }
+    p->results[p->count++] = r;
+}
+int prober_best_path(path_prober_t *p) {
+    if (p->count == 0) return -1;
+    size_t best = 0;
+    for (size_t i = 1; i < p->count; i++) {
+        if (p->results[i].rtt_ms < p->results[best].rtt_ms ||
+            (p->results[i].rtt_ms == p->results[best].rtt_ms && p->results[i].loss_ratio < p->results[best].loss_ratio)) {
+            best = i;
+        }
+    }
+    return p->results[best].path_id;
+}
