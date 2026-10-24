@@ -25,6 +25,7 @@
 #define TLV_CHAIN_EPOCH 0x05
 #define TLV_REFLECTS_INPUT_SEQ 0x06
 #define TLV_SEND_EPOCH_MS 0x07
+#define TLV_PATH_ID 0x13
 #define TLV_STREAM_ID 0x10
 #define TLV_GREASE 0x7F
 
@@ -35,6 +36,7 @@ header_ext_t *hex_new(void);
 void hex_free(header_ext_t *h);
 int hex_push_u64(header_ext_t *h, uint8_t kind, uint64_t v);
 int hex_push_u32(header_ext_t *h, uint8_t kind, uint32_t v);
+int hex_push_u8(header_ext_t *h, uint8_t kind, uint8_t v);
 int hex_push_u16pair(header_ext_t *h, uint8_t kind, uint16_t a, uint16_t b);
 const uint8_t *hex_get(header_ext_t *h, uint8_t kind, size_t *outlen);
 size_t hex_encoded_len(header_ext_t *h);
@@ -50,6 +52,7 @@ typedef struct {
     uint32_t chain_epoch;
     uint64_t reflects_input_seq;
     uint32_t stream_id;
+    uint8_t path_id;
     uint64_t send_epoch_ms;
 } update_meta_t;
 

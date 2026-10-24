@@ -42,6 +42,10 @@ int hex_push_u64(header_ext_t *h, uint8_t kind, uint64_t v) {
     for (int i = 0; i < 8; i++) b[i] = (v >> (8*i)) & 0xff;
     return hex_push_raw(h, kind, b, 8);
 }
+int hex_push_u8(header_ext_t *h, uint8_t kind, uint8_t v) {
+    uint8_t b[1] = { v };
+    return hex_push_raw(h, kind, b, 1);
+}
 int hex_push_u32(header_ext_t *h, uint8_t kind, uint32_t v) {
     uint8_t b[4];
     for (int i = 0; i < 4; i++) b[i] = (v >> (8*i)) & 0xff;
@@ -111,6 +115,7 @@ header_ext_t *update_meta_to_ext(const update_meta_t *m) {
     hex_push_u32(h, TLV_CHAIN_EPOCH, m->chain_epoch);
     hex_push_u64(h, TLV_REFLECTS_INPUT_SEQ, m->reflects_input_seq);
     hex_push_u32(h, TLV_STREAM_ID, m->stream_id);
+    hex_push_u8(h, TLV_PATH_ID, m->path_id);
     hex_push_u64(h, TLV_SEND_EPOCH_MS, m->send_epoch_ms);
     return h;
 }
@@ -135,6 +140,8 @@ int update_meta_from_ext(const header_ext_t *ext, update_meta_t *out) {
     if (v && l==8) out->reflects_input_seq = rd64(v);
     v = hex_get((header_ext_t*)ext, TLV_STREAM_ID, &l);
     if (v && l==4) out->stream_id = rd32(v);
+    v = hex_get((header_ext_t*)ext, TLV_PATH_ID, &l);
+    if (v && l==1) out->path_id = v[0];
     v = hex_get((header_ext_t*)ext, TLV_SEND_EPOCH_MS, &l);
     if (v && l==8) out->send_epoch_ms = rd64(v);
     return 0;
