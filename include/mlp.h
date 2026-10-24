@@ -89,3 +89,9 @@ int fragment_parse(fragment_t *f, const uint8_t *buf, size_t buflen, size_t *con
 /* Minimal sender helper: build fragments for one update into out (returns count, -1 on error) */
 int sender_enqueue_update(const uint8_t *payload, size_t payload_len, uint32_t object_id,
                           uint8_t *out, size_t outcap, size_t *outlen);
+
+/* Minimal receiver helper */
+typedef struct { uint16_t *cells; uint32_t w, h; } surface_canvas_t;
+surface_canvas_t *canvas_new(uint32_t w, uint32_t h);
+void canvas_free(surface_canvas_t *c);
+int receiver_accept_fragment(surface_canvas_t *c, const uint8_t *data, size_t len);

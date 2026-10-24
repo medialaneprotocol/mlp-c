@@ -240,3 +240,23 @@ int sender_enqueue_update(const uint8_t *payload, size_t payload_len, uint32_t o
     fragment_free(f);
     return 1;
 }
+
+surface_canvas_t *canvas_new(uint32_t w, uint32_t h) {
+    surface_canvas_t *c = calloc(1, sizeof(*c));
+    c->w = w; c->h = h;
+    c->cells = calloc((size_t)w * h, sizeof(uint16_t));
+    return c;
+}
+void canvas_free(surface_canvas_t *c) {
+    if (!c) return;
+    free(c->cells);
+    free(c);
+}
+int receiver_accept_fragment(surface_canvas_t *c, const uint8_t *data, size_t len) {
+    fragment_t *f = fragment_new();
+    size_t consumed = 0;
+    if (fragment_parse(f, data, len, &consumed) != 0) { fragment_free(f); return -1; }
+    if (consumed != len) { fragment_free(f); return -1; }
+    fragment_free(f);
+    return 0;
+}
