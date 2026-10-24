@@ -218,3 +218,12 @@ void resume_manager_free(resume_manager_t *r);
 void resume_manager_park(resume_manager_t *r, uint64_t last_applied_id, uint32_t chain_epoch, uint64_t pending_cells);
 int resume_manager_resume(resume_manager_t *r, uint64_t *out_id, uint32_t *out_epoch, uint64_t *out_pending);
 int resume_manager_is_parked(resume_manager_t *r);
+
+/* Input manager helper */
+typedef struct { uint64_t next_seq; char **pressed; size_t pressed_count, pressed_cap; uint64_t *deadlines; uint64_t *submitted; size_t sub_count, sub_cap; } input_manager_t;
+input_manager_t *input_manager_new(void);
+void input_manager_free(input_manager_t *m);
+uint64_t input_manager_submit(input_manager_t *m, const char *code, int pressed, uint64_t deadline_ms);
+int input_manager_is_pressed(input_manager_t *m, const char *code);
+size_t input_manager_pressed_count(input_manager_t *m);
+size_t input_manager_expired(input_manager_t *m, uint64_t now_ms, uint64_t *out);

@@ -662,3 +662,61 @@ int resume_manager_resume(resume_manager_t *r, uint64_t *out_id, uint32_t *out_e
     return 1;
 }
 int resume_manager_is_parked(resume_manager_t *r) { return r->parked; }
+
+input_manager_t *input_manager_new(void) { return calloc(1, sizeof(input_manager_t)); }
+void input_manager_free(input_manager_t *m) {
+    if (!m) return;
+    for (size_t i = 0; i < m->pressed_count; i++) free(m->pressed[i]);
+    free(m->pressed);
+    free(m->deadlines);
+    free(m->submitted);
+    free(m);
+}
+static int im_pressed_idx(input_manager_t *m, const char *code) {
+    for (size_t i = 0; i < m->pressed_count; i++) if (strcmp(m->pressed[i], code) == 0) return (int)i;
+    return -1;
+}
+uint64_t input_manager_submit(input_manager_t *m, const char *code, int pressed, uint64_t deadline_ms) {
+    uint64_t seq = m->next_seq++;
+    if (pressed) {
+        if (im_pressed_idx(m, code) < 0) {
+            if (m->pressed_count == m->pressed_cap) {
+                m->pressed_cap = m->pressed_cap ? m->pressed_cap * 2 : 8;
+                m->pressed = realloc(m->pressed, m->pressed_cap * sizeof(char*));
+            }
+            m->pressed[m->pressed_count] = strdup(code);
+            m->pressed_count++;
+        }
+    } else {
+        int idx = im_pressed_idx(m, code);
+        if (idx >= 0) {
+            free(m->pressed[idx]);
+            m->pressed[idx] = m->pressed[--m->pressed_count];
+        }
+    }
+    /* store deadline */
+    if (m->sub_count == m->sub_cap) {
+        m->sub_cap = m->sub_cap ? m->sub_cap * 2 : 8;
+        m->deadlines = realloc(m->deadlines, m->sub_cap * sizeof(uint64_t));
+        m->submitted = realloc(m->submitted, m->sub_cap * sizeof(uint64_t));
+    }
+    m->deadlines[m->sub_count] = deadline_ms;
+    m->submitted[m->sub_count] = seq;
+    m->sub_count++;
+    (void)seq;
+    return seq;
+}
+int input_manager_is_pressed(input_manager_t *m, const char *code) {
+    return im_pressed_idx(m, code) >= 0;
+}
+size_t input_manager_pressed_count(input_manager_t *m) { return m->pressed_count; }
+size_t input_manager_expired(input_manager_t *m, uint64_t now_ms, uint64_t *out) {
+    size_t n = 0;
+    for (size_t i = 0; i < m->sub_count; i++) {
+        if (m->deadlines[i] != 0 && now_ms > m->deadlines[i]) {
+            if (out) out[n] = m->submitted[i];
+            n++;
+        }
+    }
+    return n;
+}

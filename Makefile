@@ -3,7 +3,7 @@ CFLAGS ?= -Iinclude -Wall -Wextra -O2
 
 .PHONY: test clean
 
-test: tests/test_golden tests/test_sender tests/test_cell tests/test_scheduler tests/test_bwe tests/test_input tests/test_fec tests/test_ticket tests/test_migration tests/test_qos tests/test_loss tests/test_assembly tests/test_metrics tests/test_interop tests/test_probe tests/test_pacer tests/test_sm tests/test_lifecycle
+test: tests/test_golden tests/test_sender tests/test_cell tests/test_scheduler tests/test_bwe tests/test_input tests/test_fec tests/test_ticket tests/test_migration tests/test_qos tests/test_loss tests/test_assembly tests/test_metrics tests/test_interop tests/test_probe tests/test_pacer tests/test_sm tests/test_lifecycle tests/test_input_mgr
 	./tests/test_golden
 	./tests/test_sender
 	./tests/test_cell
@@ -22,6 +22,7 @@ test: tests/test_golden tests/test_sender tests/test_cell tests/test_scheduler t
 	./tests/test_pacer
 	./tests/test_sm
 	./tests/test_lifecycle
+	./tests/test_input_mgr
 
 tests/test_golden: src/mlp.c tests/test_golden.c
 	$(CC) $(CFLAGS) src/mlp.c tests/test_golden.c -o tests/test_golden
@@ -76,6 +77,9 @@ tests/test_sm: src/mlp.c tests/test_sm.c
 
 tests/test_lifecycle: src/mlp.c tests/test_lifecycle.c
 	$(CC) $(CFLAGS) src/mlp.c tests/test_lifecycle.c -o tests/test_lifecycle
+
+tests/test_input_mgr: src/mlp.c tests/test_input_mgr.c
+	$(CC) $(CFLAGS) src/mlp.c tests/test_input_mgr.c -o tests/test_input_mgr
 
 clean:
 	rm -f tests/test_golden
