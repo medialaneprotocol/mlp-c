@@ -12,6 +12,7 @@
 #define MAX_HEADER_EXT 256
 
 #define CLASS_MEDIA 2
+#define CLASS_DATAGRAM 5
 
 #define PRIO_INPUT 1
 #define PRIO_MEDIA 6
@@ -24,6 +25,7 @@
 #define TLV_CHAIN_EPOCH 0x05
 #define TLV_REFLECTS_INPUT_SEQ 0x06
 #define TLV_SEND_EPOCH_MS 0x07
+#define TLV_STREAM_ID 0x10
 #define TLV_GREASE 0x7F
 
 typedef struct { uint8_t kind; uint8_t *value; size_t len; } tlv_entry_t;
@@ -47,6 +49,7 @@ typedef struct {
     uint32_t update_bytes;
     uint32_t chain_epoch;
     uint64_t reflects_input_seq;
+    uint32_t stream_id;
     uint64_t send_epoch_ms;
 } update_meta_t;
 

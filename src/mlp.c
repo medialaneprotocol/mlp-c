@@ -110,6 +110,7 @@ header_ext_t *update_meta_to_ext(const update_meta_t *m) {
     hex_push_u32(h, TLV_UPDATE_BYTES, m->update_bytes);
     hex_push_u32(h, TLV_CHAIN_EPOCH, m->chain_epoch);
     hex_push_u64(h, TLV_REFLECTS_INPUT_SEQ, m->reflects_input_seq);
+    hex_push_u32(h, TLV_STREAM_ID, m->stream_id);
     hex_push_u64(h, TLV_SEND_EPOCH_MS, m->send_epoch_ms);
     return h;
 }
@@ -132,6 +133,8 @@ int update_meta_from_ext(const header_ext_t *ext, update_meta_t *out) {
     if (v && l==4) out->chain_epoch = rd32(v);
     v = hex_get((header_ext_t*)ext, TLV_REFLECTS_INPUT_SEQ, &l);
     if (v && l==8) out->reflects_input_seq = rd64(v);
+    v = hex_get((header_ext_t*)ext, TLV_STREAM_ID, &l);
+    if (v && l==4) out->stream_id = rd32(v);
     v = hex_get((header_ext_t*)ext, TLV_SEND_EPOCH_MS, &l);
     if (v && l==8) out->send_epoch_ms = rd64(v);
     return 0;
