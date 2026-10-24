@@ -431,3 +431,53 @@ int qos_weight(int tier) {
     }
     return 1;
 }
+
+static int ld_contains(uint64_t *arr, size_t n, uint64_t v) {
+    for (size_t i=0;i<n;i++) if (arr[i]==v) return 1;
+    return 0;
+}
+loss_detector_t *loss_detector_new(uint64_t threshold) {
+    loss_detector_t *ld = calloc(1, sizeof(*ld));
+    ld->threshold = threshold ? threshold : 3;
+    ld->lost_cap = 16;
+    ld->lost = calloc(ld->lost_cap, sizeof(uint64_t));
+    return ld;
+}
+void loss_detector_free(loss_detector_t *ld) {
+    if (!ld) return;
+    free(ld->lost);
+    free(ld);
+}
+void loss_detector_on_send(loss_detector_t *ld, uint64_t pn) {
+    /* track sent in lost array? We'll just record in a simple way: store sent in lost with sentinel? 
+       Instead, track sent separately is complex; for simplicity, detect based on acked gaps only. */
+}
+void loss_detector_on_ack(loss_detector_t *ld, const uint64_t *acked, size_t n) {
+    for (size_t i=0;i<n;i++) {
+        if (!ld->has_largest || acked[i] > ld->largest_acked) {
+            ld->largest_acked = acked[i];
+            ld->has_largest = 1;
+        }
+    }
+    /* detect: any pn < largest with gap >= threshold and not acked -> lost */
+    /* We need sent set; approximate: check 0..largest */
+    for (uint64_t pn = 0; pn < ld->largest_acked; pn++) {
+        /* check if pn was acked */
+        int acked_pn = 0;
+        for (size_t i=0;i<n;i++) if (acked[i]==pn) { acked_pn=1; break; }
+        if (acked_pn) continue;
+        if (ld->has_largest && ld->largest_acked - pn >= ld->threshold) {
+            if (!ld_contains(ld->lost, ld->lost_count, pn)) {
+                if (ld->lost_count == ld->lost_cap) {
+                    ld->lost_cap *= 2;
+                    ld->lost = realloc(ld->lost, ld->lost_cap * sizeof(uint64_t));
+                }
+                ld->lost[ld->lost_count++] = pn;
+            }
+        }
+    }
+}
+int loss_detector_is_lost(loss_detector_t *ld, uint64_t pn) {
+    return ld_contains(ld->lost, ld->lost_count, pn);
+}
+size_t loss_detector_lost_count(loss_detector_t *ld) { return ld->lost_count; }

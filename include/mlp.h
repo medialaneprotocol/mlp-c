@@ -148,3 +148,12 @@ int migration_is_probing(path_migration_t *m);
 /* QoS helpers */
 int qos_mlp_priority(int tier);
 int qos_weight(int tier);
+
+/* Loss detection helper */
+typedef struct { uint64_t *lost; size_t lost_count, lost_cap; uint64_t largest_acked; int has_largest; uint64_t threshold; } loss_detector_t;
+loss_detector_t *loss_detector_new(uint64_t threshold);
+void loss_detector_free(loss_detector_t *ld);
+void loss_detector_on_send(loss_detector_t *ld, uint64_t pn);
+void loss_detector_on_ack(loss_detector_t *ld, const uint64_t *acked, size_t n);
+int loss_detector_is_lost(loss_detector_t *ld, uint64_t pn);
+size_t loss_detector_lost_count(loss_detector_t *ld);
