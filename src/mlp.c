@@ -306,3 +306,10 @@ int scheduler_max_chunks(int datagram, double loss_ratio) {
     if (datagram) return 1;
     return 8;
 }
+
+bwe_estimate_t bwe_estimate(uint64_t pace_floor_bps, double rtt_ms) {
+    bwe_estimate_t e;
+    e.rtt_ms = rtt_ms;
+    e.pace_bps = pace_floor_bps;
+    return e;
+}

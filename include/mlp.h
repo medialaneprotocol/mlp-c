@@ -107,3 +107,7 @@ int cell_accounting_converged(cell_accounting_t *a);
 
 /* Scheduler helper */
 int scheduler_max_chunks(int datagram, double loss_ratio);
+
+/* BWE helper */
+typedef struct { double rtt_ms; uint64_t pace_bps; } bwe_estimate_t;
+bwe_estimate_t bwe_estimate(uint64_t pace_floor_bps, double rtt_ms);
