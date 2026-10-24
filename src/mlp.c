@@ -630,3 +630,35 @@ media_lane_policy_t *policy_new(int enabled) {
     return p;
 }
 void policy_free(media_lane_policy_t *p) { free(p); }
+
+lane_lifecycle_t *lifecycle_new(void) {
+    lane_lifecycle_t *l = calloc(1, sizeof(*l));
+    l->stale_budget_ms = 3000;
+    return l;
+}
+void lifecycle_free(lane_lifecycle_t *l) { free(l); }
+void lifecycle_set_active(lane_lifecycle_t *l) { l->state = 2; l->parked = 0; }
+void lifecycle_set_parked(lane_lifecycle_t *l) { l->state = 3; l->parked = 1; }
+int lifecycle_is_parked(lane_lifecycle_t *l) { return l->parked; }
+void lifecycle_set_loss_ratio(lane_lifecycle_t *l, double r) {
+    l->loss_ratio = r;
+    l->loss_degraded = r > 0.05;
+}
+
+resume_manager_t *resume_manager_new(void) { return calloc(1, sizeof(resume_manager_t)); }
+void resume_manager_free(resume_manager_t *r) { free(r); }
+void resume_manager_park(resume_manager_t *r, uint64_t last_applied_id, uint32_t chain_epoch, uint64_t pending_cells) {
+    r->parked = 1;
+    r->last_applied_id = last_applied_id;
+    r->chain_epoch = chain_epoch;
+    r->pending_cells = pending_cells;
+}
+int resume_manager_resume(resume_manager_t *r, uint64_t *out_id, uint32_t *out_epoch, uint64_t *out_pending) {
+    if (!r->parked) return 0;
+    r->parked = 0;
+    if (out_id) *out_id = r->last_applied_id;
+    if (out_epoch) *out_epoch = r->chain_epoch;
+    if (out_pending) *out_pending = r->pending_cells;
+    return 1;
+}
+int resume_manager_is_parked(resume_manager_t *r) { return r->parked; }

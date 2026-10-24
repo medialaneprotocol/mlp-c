@@ -201,3 +201,20 @@ int sm_is_closed(state_machine_t *sm);
 typedef struct { int lane_mode; int media_lane_enabled; } media_lane_policy_t;
 media_lane_policy_t *policy_new(int enabled);
 void policy_free(media_lane_policy_t *p);
+
+/* Lifecycle helper */
+typedef struct { int state; int parked; int converged; double loss_ratio; int loss_degraded; int disabled; uint64_t stale_budget_ms; } lane_lifecycle_t;
+lane_lifecycle_t *lifecycle_new(void);
+void lifecycle_free(lane_lifecycle_t *l);
+void lifecycle_set_active(lane_lifecycle_t *l);
+void lifecycle_set_parked(lane_lifecycle_t *l);
+int lifecycle_is_parked(lane_lifecycle_t *l);
+void lifecycle_set_loss_ratio(lane_lifecycle_t *l, double r);
+
+/* Resume helper */
+typedef struct { int parked; uint64_t last_applied_id; uint32_t chain_epoch; uint64_t pending_cells; } resume_manager_t;
+resume_manager_t *resume_manager_new(void);
+void resume_manager_free(resume_manager_t *r);
+void resume_manager_park(resume_manager_t *r, uint64_t last_applied_id, uint32_t chain_epoch, uint64_t pending_cells);
+int resume_manager_resume(resume_manager_t *r, uint64_t *out_id, uint32_t *out_epoch, uint64_t *out_pending);
+int resume_manager_is_parked(resume_manager_t *r);
