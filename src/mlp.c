@@ -191,7 +191,9 @@ int fragment_parse(fragment_t *f, const uint8_t *buf, size_t buflen, size_t *con
     f->header.version = buf[4];
     if (f->header.version != MEDIA_PROTOCOL_VERSION) return -1;
     f->header.cls = buf[5];
+    if (f->header.cls > CLASS_PATH) return -1; /* 5..=255 reserved: BAD_CLASS */
     f->header.flags = buf[6];
+    if (f->header.flags & 0x80) return -1;     /* bit 7 reserved: BAD_FLAGS */
     f->header.priority = buf[7];
     if (f->header.priority > 7) return -1;
     f->header.object_id = rd32(buf+8);
@@ -199,7 +201,8 @@ int fragment_parse(fragment_t *f, const uint8_t *buf, size_t buflen, size_t *con
     f->header.fragment_count = rd16(buf+14);
     f->header.payload_len = rd32(buf+16);
     f->header.header_ext_len = rd16(buf+20);
-    if (f->header.fragment_count == 0 || f->header.fragment_index >= f->header.fragment_count) return -1;
+    if (f->header.fragment_count == 0 || f->header.fragment_count > MAX_FRAGMENT_COUNT
+        || f->header.fragment_index >= f->header.fragment_count) return -1;
     if (f->header.cls == CLASS_MEDIA && f->header.priority <= PRIO_INPUT) return -1;
     uint16_t extlen = f->header.header_ext_len;
     if (extlen != 0 && extlen < 2) return -1;
@@ -236,7 +239,7 @@ int sender_enqueue_update(const uint8_t *payload, size_t payload_len, uint32_t o
     f->ext = ext;
     f->header.version = MEDIA_PROTOCOL_VERSION;
     f->header.cls = CLASS_MEDIA;
-    f->header.flags = 0;
+    f->header.flags = FLAG_FIN; /* a single-fragment update is its own FIN */
     f->header.priority = PRIO_MEDIA;
     f->header.object_id = object_id;
     f->header.fragment_index = 0;
@@ -252,18 +255,7 @@ int sender_enqueue_update(const uint8_t *payload, size_t payload_len, uint32_t o
     return 1;
 }
 
-surface_canvas_t *canvas_new(uint32_t w, uint32_t h) {
-    surface_canvas_t *c = calloc(1, sizeof(*c));
-    c->w = w; c->h = h;
-    c->cells = calloc((size_t)w * h, sizeof(uint16_t));
-    return c;
-}
-void canvas_free(surface_canvas_t *c) {
-    if (!c) return;
-    free(c->cells);
-    free(c);
-}
-int receiver_accept_fragment(surface_canvas_t *c, const uint8_t *data, size_t len) {
+int receiver_accept_fragment(const uint8_t *data, size_t len) {
     fragment_t *f = fragment_new();
     size_t consumed = 0;
     if (fragment_parse(f, data, len, &consumed) != 0) { fragment_free(f); return -1; }
@@ -312,17 +304,10 @@ void cell_accounting_mark_applied(cell_accounting_t *a, const uint32_t *cells, s
 size_t cell_accounting_pending_count(cell_accounting_t *a) { return a->pending_count; }
 int cell_accounting_converged(cell_accounting_t *a) { return a->pending_count == 0; }
 
-int scheduler_max_chunks(int datagram, double loss_ratio) {
-    (void)loss_ratio;
+int scheduler_max_parts(int datagram, double loss_ratio) {
     if (datagram) return 1;
+    if (loss_ratio > 0.05) return 2;
     return 8;
-}
-
-bwe_estimate_t bwe_estimate(uint64_t pace_floor_bps, double rtt_ms) {
-    bwe_estimate_t e;
-    e.rtt_ms = rtt_ms;
-    e.pace_bps = pace_floor_bps;
-    return e;
 }
 
 input_queue_t *input_queue_new(void) {
@@ -347,15 +332,6 @@ void input_queue_submit(input_queue_t *q, const char *code, int pressed, uint64_
     q->count++;
 }
 size_t input_queue_len(input_queue_t *q) { return q->count; }
-
-void xor_parity(const uint8_t **data, const size_t *lens, size_t n, uint8_t *out, size_t outlen) {
-    memset(out, 0, outlen);
-    for (size_t i = 0; i < n; i++) {
-        for (size_t j = 0; j < lens[i] && j < outlen; j++) {
-            out[j] ^= data[i][j];
-        }
-    }
-}
 
 session_ticket_t *ticket_issue(uint64_t last_applied_update_id, uint32_t chain_epoch, uint64_t now_ms) {
     session_ticket_t *t = calloc(1, sizeof(*t));
@@ -446,26 +422,37 @@ loss_detector_t *loss_detector_new(uint64_t threshold) {
 }
 void loss_detector_free(loss_detector_t *ld) {
     if (!ld) return;
+    free(ld->sent);
+    free(ld->acked);
     free(ld->lost);
     free(ld);
 }
 void loss_detector_on_send(loss_detector_t *ld, uint64_t pn) {
-    /* track sent in lost array? We'll just record in a simple way: store sent in lost with sentinel? 
-       Instead, track sent separately is complex; for simplicity, detect based on acked gaps only. */
+    if (ld->sent_count == ld->sent_cap) {
+        ld->sent_cap = ld->sent_cap ? ld->sent_cap * 2 : 16;
+        ld->sent = realloc(ld->sent, ld->sent_cap * sizeof(uint64_t));
+    }
+    ld->sent[ld->sent_count++] = pn;
 }
 void loss_detector_on_ack(loss_detector_t *ld, const uint64_t *acked, size_t n) {
     for (size_t i=0;i<n;i++) {
+        if (ld->acked_count == ld->acked_cap) {
+            ld->acked_cap = ld->acked_cap ? ld->acked_cap * 2 : 16;
+            ld->acked = realloc(ld->acked, ld->acked_cap * sizeof(uint64_t));
+        }
+        ld->acked[ld->acked_count++] = acked[i];
         if (!ld->has_largest || acked[i] > ld->largest_acked) {
             ld->largest_acked = acked[i];
             ld->has_largest = 1;
         }
     }
-    /* detect: any pn < largest with gap >= threshold and not acked -> lost */
-    /* We need sent set; approximate: check 0..largest */
-    for (uint64_t pn = 0; pn < ld->largest_acked; pn++) {
-        /* check if pn was acked */
+    /* detect: a sent pn below the largest ack, with a gap of the
+     * threshold, that no ack named, is lost */
+    for (size_t si = 0; si < ld->sent_count; si++) {
+        uint64_t pn = ld->sent[si];
+        if (pn >= ld->largest_acked) continue;
         int acked_pn = 0;
-        for (size_t i=0;i<n;i++) if (acked[i]==pn) { acked_pn=1; break; }
+        for (size_t i=0;i<ld->acked_count;i++) if (ld->acked[i]==pn) { acked_pn=1; break; }
         if (acked_pn) continue;
         if (ld->has_largest && ld->largest_acked - pn >= ld->threshold) {
             if (!ld_contains(ld->lost, ld->lost_count, pn)) {
@@ -499,6 +486,21 @@ void assembler_free(object_assembler_t *a) {
     free(a->objects);
     free(a);
 }
+static int asm_seen(object_assembler_t *a, uint32_t oid) {
+    for (size_t i = 0; i < a->seen_count; i++) if (a->seen[i] == oid) return 1;
+    return 0;
+}
+static void asm_remember(object_assembler_t *a, uint32_t oid) {
+    if (a->seen_count == a->seen_cap) {
+        a->seen_cap = a->seen_cap ? a->seen_cap * 2 : DEDUP_WINDOW;
+        a->seen = realloc(a->seen, a->seen_cap * sizeof(uint32_t));
+    }
+    a->seen[a->seen_count++] = oid;
+    while (a->seen_count > DEDUP_WINDOW) {
+        memmove(a->seen, a->seen + 1, (a->seen_count - 1) * sizeof(uint32_t));
+        a->seen_count--;
+    }
+}
 static open_object_t *assembler_find(object_assembler_t *a, uint32_t oid) {
     for (size_t i = 0; i < a->count; i++) if (a->objects[i].object_id == oid && !a->objects[i].complete) return &a->objects[i];
     return NULL;
@@ -508,8 +510,10 @@ int assembler_accept(object_assembler_t *a, const uint8_t *data, size_t len, ope
     size_t consumed = 0;
     if (fragment_parse(f, data, len, &consumed) != 0) { fragment_free(f); return -1; }
     if (consumed != len) { fragment_free(f); return -1; }
+    if (asm_seen(a, f->header.object_id)) { fragment_free(f); return 0; /* replay refused whole */ }
     open_object_t *obj = assembler_find(a, f->header.object_id);
     if (!obj) {
+        if (assembler_open_count(a) >= MAX_OPEN_OBJECTS) { fragment_free(f); return -1; }
         if (a->count == a->cap) {
             a->cap *= 2;
             a->objects = realloc(a->objects, a->cap * sizeof(open_object_t));
@@ -523,16 +527,23 @@ int assembler_accept(object_assembler_t *a, const uint8_t *data, size_t len, ope
     }
     if (f->header.fragment_count != obj->declared) { fragment_free(f); return -1; }
     uint16_t idx = f->header.fragment_index;
-    if (obj->parts[idx] != NULL) { fragment_free(f); return -1; /* duplicate */ }
+    if (obj->parts[idx] != NULL) { fragment_free(f); return 0; /* duplicate fragment, held */ }
+    if (a->bytes + f->payload_len > MAX_ASSEMBLY_BYTES) { fragment_free(f); return -1; }
     obj->parts[idx] = malloc(f->payload_len ? f->payload_len : 1);
     memcpy(obj->parts[idx], f->payload, f->payload_len);
     obj->part_lens[idx] = f->payload_len;
     obj->received++;
-    if (obj->received >= obj->declared) {
+    obj->bytes_held += f->payload_len;
+    a->bytes += f->payload_len;
+    if (f->header.flags & FLAG_FIN) obj->saw_fin = 1;
+    /* An object is whole when its FIN arrived and every fragment is held. */
+    if (obj->saw_fin && obj->received >= obj->declared) {
         obj->complete = 1;
+        a->bytes -= obj->bytes_held;
+        asm_remember(a, obj->object_id);
         if (out) *out = obj;
         fragment_free(f);
-        return 1; /* complete */
+        return 1;
     }
     fragment_free(f);
     return 0; /* pending */
@@ -546,21 +557,45 @@ size_t assembler_open_count(object_assembler_t *a) {
 mlp_metrics_t *metrics_new(void) { return calloc(1, sizeof(mlp_metrics_t)); }
 void metrics_free(mlp_metrics_t *m) { free(m); }
 void metrics_fragment_sent(mlp_metrics_t *m, uint64_t bytes) { m->fragments_sent++; m->bytes_sent += bytes; }
+void metrics_fragment_received(mlp_metrics_t *m, uint64_t bytes) { m->fragments_received++; m->bytes_received += bytes; }
 void metrics_update_applied(mlp_metrics_t *m) { m->updates_applied++; }
+void metrics_convergence(mlp_metrics_t *m) { m->convergences++; }
+void metrics_loss(mlp_metrics_t *m) { m->losses++; }
+void metrics_echo(mlp_metrics_t *m) { m->echoes++; }
 size_t metrics_render(mlp_metrics_t *m, char *buf, size_t cap) {
     int n = snprintf(buf, cap,
         "# HELP mlp_fragments_sent_total Total fragments sent.\n"
         "# TYPE mlp_fragments_sent_total counter\n"
         "mlp_fragments_sent_total %lu\n"
+        "# HELP mlp_fragments_received_total Total fragments received.\n"
+        "# TYPE mlp_fragments_received_total counter\n"
+        "mlp_fragments_received_total %lu\n"
         "# HELP mlp_bytes_sent_total Total bytes sent.\n"
         "# TYPE mlp_bytes_sent_total counter\n"
         "mlp_bytes_sent_total %lu\n"
+        "# HELP mlp_bytes_received_total Total bytes received.\n"
+        "# TYPE mlp_bytes_received_total counter\n"
+        "mlp_bytes_received_total %lu\n"
         "# HELP mlp_updates_applied_total Total updates applied.\n"
         "# TYPE mlp_updates_applied_total counter\n"
-        "mlp_updates_applied_total %lu\n",
+        "mlp_updates_applied_total %lu\n"
+        "# HELP mlp_convergences_total Total convergences.\n"
+        "# TYPE mlp_convergences_total counter\n"
+        "mlp_convergences_total %lu\n"
+        "# HELP mlp_losses_total Total losses detected.\n"
+        "# TYPE mlp_losses_total counter\n"
+        "mlp_losses_total %lu\n"
+        "# HELP mlp_echoes_total Total echoes measured.\n"
+        "# TYPE mlp_echoes_total counter\n"
+        "mlp_echoes_total %lu\n",
         (unsigned long)m->fragments_sent,
+        (unsigned long)m->fragments_received,
         (unsigned long)m->bytes_sent,
-        (unsigned long)m->updates_applied);
+        (unsigned long)m->bytes_received,
+        (unsigned long)m->updates_applied,
+        (unsigned long)m->convergences,
+        (unsigned long)m->losses,
+        (unsigned long)m->echoes);
     return n > 0 ? (size_t)n : 0;
 }
 
@@ -617,12 +652,6 @@ int pacer_try_acquire(simple_pacer_t *p, uint64_t bytes, double now_sec) {
 }
 uint64_t pacer_budget(simple_pacer_t *p) { return p->max_grant; }
 
-state_machine_t *sm_new(void) { state_machine_t *sm = calloc(1, sizeof(*sm)); return sm; }
-void sm_free(state_machine_t *sm) { free(sm); }
-void sm_transition(state_machine_t *sm, int to) { sm->phase = to; }
-int sm_is_active(state_machine_t *sm) { return sm->phase == 2; } /* ACTIVE=2 */
-int sm_is_closed(state_machine_t *sm) { return sm->phase == 6; } /* CLOSED=6 */
-
 media_lane_policy_t *policy_new(int enabled) {
     media_lane_policy_t *p = calloc(1, sizeof(*p));
     p->lane_mode = 0;
@@ -633,29 +662,42 @@ void policy_free(media_lane_policy_t *p) { free(p); }
 
 lane_lifecycle_t *lifecycle_new(void) {
     lane_lifecycle_t *l = calloc(1, sizeof(*l));
+    l->state = LANE_STATE_STARTING;
     l->stale_budget_ms = 3000;
     return l;
 }
 void lifecycle_free(lane_lifecycle_t *l) { free(l); }
-void lifecycle_set_active(lane_lifecycle_t *l) { l->state = 2; l->parked = 0; }
-void lifecycle_set_parked(lane_lifecycle_t *l) { l->state = 3; l->parked = 1; }
-int lifecycle_is_parked(lane_lifecycle_t *l) { return l->parked; }
-void lifecycle_set_loss_ratio(lane_lifecycle_t *l, double r) {
-    l->loss_ratio = r;
-    l->loss_degraded = r > 0.05;
+void lifecycle_set_applied(lane_lifecycle_t *l, uint64_t now_ms, uint64_t pending_cells) {
+    /* A state is a fact both ends can measure: progress is the one thing
+     * that clears stale. */
+    l->last_applied_ms = now_ms;
+    l->has_applied = 1;
+    l->pending_cells = pending_cells;
+    l->converged = pending_cells == 0;
+    if (l->state == LANE_STATE_PARKED || l->state == LANE_STATE_DISABLED
+        || l->state == LANE_STATE_MEDIA_UNSUPPORTED) return;
+    if (l->no_feedback) l->state = LANE_STATE_NO_FEEDBACK;
+    else if (l->converged) l->state = LANE_STATE_LIVE;
+    else if (now_ms - l->last_applied_ms > l->stale_budget_ms) l->state = LANE_STATE_STALE;
+    else l->state = LANE_STATE_CONVERGING;
+    l->since_ms = now_ms;
 }
 
 resume_manager_t *resume_manager_new(void) { return calloc(1, sizeof(resume_manager_t)); }
 void resume_manager_free(resume_manager_t *r) { free(r); }
-void resume_manager_park(resume_manager_t *r, uint64_t last_applied_id, uint32_t chain_epoch, uint64_t pending_cells) {
+void resume_manager_park(resume_manager_t *r, uint64_t last_applied_id, uint32_t chain_epoch, uint64_t pending_cells, uint64_t now_ms) {
     r->parked = 1;
     r->last_applied_id = last_applied_id;
     r->chain_epoch = chain_epoch;
     r->pending_cells = pending_cells;
+    r->parked_at_ms = now_ms;
+    r->ttl_seconds = PARK_TTL_DEFAULT;
 }
-int resume_manager_resume(resume_manager_t *r, uint64_t *out_id, uint32_t *out_epoch, uint64_t *out_pending) {
+int resume_manager_resume(resume_manager_t *r, uint64_t now_ms, uint64_t *out_id, uint32_t *out_epoch, uint64_t *out_pending) {
     if (!r->parked) return 0;
     r->parked = 0;
+    /* A claim past the TTL finds the state gone: expired, not resumed. */
+    if (now_ms - r->parked_at_ms > r->ttl_seconds * 1000) return -1;
     if (out_id) *out_id = r->last_applied_id;
     if (out_epoch) *out_epoch = r->chain_epoch;
     if (out_pending) *out_pending = r->pending_cells;
@@ -719,4 +761,48 @@ size_t input_manager_expired(input_manager_t *m, uint64_t now_ms, uint64_t *out)
         }
     }
     return n;
+}
+
+/* The 64-update ack window: bit 0 names the highest applied update. */
+
+void ack_window_reset(ack_window_t *w) { w->highest = 0; w->bits = 0; }
+
+void ack_window_mark(ack_window_t *w, uint64_t update_id) {
+    if (update_id > w->highest) {
+        uint64_t shift = update_id - w->highest;
+        if (shift >= 64) w->bits = 1;
+        else w->bits = (w->bits << shift | 1) & UINT64_C(0xffffffffffffffff);
+        w->highest = update_id;
+        return;
+    }
+    uint64_t distance = w->highest - update_id;
+    if (distance < 64) w->bits |= UINT64_C(1) << distance;
+}
+
+int ack_window_has(const ack_window_t *w, uint64_t update_id) {
+    if (update_id < 1 || update_id > w->highest) return 0;
+    uint64_t distance = w->highest - update_id;
+    if (distance >= 64) return 0;
+    return (w->bits & (UINT64_C(1) << distance)) != 0;
+}
+
+void ack_window_seed_from_resume(ack_window_t *w, uint64_t highest_applied) {
+    ack_window_reset(w);
+    w->highest = highest_applied;
+    if (w->highest > 0) w->bits = 1;
+}
+
+/* The carriers, with the budgets the specification freezes. */
+
+size_t carrier_fragment_payload_max(int carrier) {
+    if (carrier == CARRIER_WS || carrier == CARRIER_GRPC) return MAX_STREAM_FRAGMENT;
+    return TARGET_FRAGMENT_PAYLOAD;
+}
+size_t carrier_message_cap(int carrier) {
+    if (carrier == CARRIER_GRPC) return MAX_GRPC_COALESCE;
+    return carrier_fragment_payload_max(carrier);
+}
+int carrier_is_datagram(int carrier) {
+    return carrier == CARRIER_DATA_CHANNEL || carrier == CARRIER_REPAIR_CHANNEL
+        || carrier == CARRIER_CONTROL_CHANNEL;
 }

@@ -2,6 +2,7 @@
 #include <stdio.h>
 int main(void) {
     loss_detector_t *ld = loss_detector_new(3);
+    for (uint64_t pn = 0; pn < 10; pn++) loss_detector_on_send(ld, pn);
     uint64_t acked[] = {0,1,2,4,5,6,7,8,9};
     loss_detector_on_ack(ld, acked, 9);
     if (!loss_detector_is_lost(ld, 3)) { printf("lost\n"); return 1; }
