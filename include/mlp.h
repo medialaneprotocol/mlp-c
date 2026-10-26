@@ -68,6 +68,8 @@ int carrier_is_datagram(int carrier);
 #define TLV_CELL_COUNT 0x0E
 #define TLV_COST_MS 0x0F
 #define TLV_STREAM_ID 0x10
+#define TLV_FEC_GROUP_ID 0x11
+#define TLV_FEC_K 0x12
 #define TLV_PATH_ID 0x13
 #define TLV_GREASE 0x7F
 
